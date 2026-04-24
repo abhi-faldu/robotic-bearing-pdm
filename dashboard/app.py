@@ -574,7 +574,6 @@ def main() -> None:
             '</div>',
             unsafe_allow_html=True,
         )
-        st.markdown('<div style="padding:12px;">', unsafe_allow_html=True)
         for b in bearings:
             selected = b["id"] == st.session_state.selected_id
             st.markdown(bearing_card_html(b, selected), unsafe_allow_html=True)
@@ -583,7 +582,6 @@ def main() -> None:
                          type="primary" if selected else "secondary"):
                 st.session_state.selected_id = b["id"]
                 st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown(sidebar_footer_html(threshold, api_ok), unsafe_allow_html=True)
 
     # ── Main panel ────────────────────────────────────────────────────────────
@@ -618,30 +616,16 @@ def main() -> None:
     tab_chart, tab_features, tab_api = st.tabs(["Time Series", "Features", "API"])
 
     with tab_chart:
-        st.markdown(
-            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 8px;">',
-            unsafe_allow_html=True,
-        )
         fig = build_chart(df_hist, threshold)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        st.markdown("</div>", unsafe_allow_html=True)
 
     with tab_features:
-        st.markdown(
-            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;">'
-            + feature_detail_html(selected) + '</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(feature_detail_html(selected).strip(), unsafe_allow_html=True)
 
     with tab_api:
-        st.markdown(
-            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;">'
-            + api_panel_html(selected) + '</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(api_panel_html(selected).strip(), unsafe_allow_html=True)
 
     # Stat cards row
-    st.markdown('<div style="display:flex;gap:10px;margin-top:12px;">', unsafe_allow_html=True)
     cols = st.columns(4)
     last_alert_val  = clock if crit_count > 0 else "—"
     last_alert_sub  = f"{selected['name']} — CRITICAL" if crit_count > 0 else "No active alerts"
@@ -656,8 +640,6 @@ def main() -> None:
     for col, (label, value, sub, vc) in zip(cols, stat_data):
         with col:
             st.markdown(stat_card_html(label, value, sub, vc), unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
     # Auto-refresh
     now = time.time()
