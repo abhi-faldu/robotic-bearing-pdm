@@ -156,16 +156,60 @@ RMS and kurtosis of Bearing 1 and 2 are the strongest discriminators.
 
 ---
 
-## 10 · Live Dashboard
+## 10 · Live Dashboard — BearingPDM
 
-The Streamlit dashboard running against the trained model:
+SCADA-style Streamlit dashboard running against the trained LSTM Autoencoder.
+Dark theme, 4-bearing sidebar, live anomaly score chart, 3-tab main panel (Time Series · Features · API).
 
-![Dashboard Screenshot](findings/06_dashboard_screenshot.png)
+---
 
-- Top bar: factory name, live clock, system health badge
-- Sidebar: 4 bearing cards with RMS, kurtosis, and anomaly score gauge
-- Main chart: 24h anomaly score time-series with μ+3σ threshold line
-- Bottom row: detection lead time, false positive rate, last alert
+### Bearing 1-X — Normal Operation (HEAL)
+
+**Time Series** — anomaly score flat at ~0.33× across 24 h, well below the μ+3σ threshold:
+
+![Bearing 1-X Time Series](findings/D01_Bearing 1-x_1.png)
+
+**Features tab** — all indicators in healthy range:
+
+| Feature | Value | Signal |
+|---|---|---|
+| RMS | 0.0254 g | Low vibration energy |
+| Kurtosis | 3.15 | Near-Gaussian — no impulses |
+| Anomaly Score | **0.33×** | 67% below threshold |
+| Reconstruction Error | 0.2831 MSE | Model reconstructs accurately |
+| Crest Factor | 3.72 | No surface pitting |
+| Spectral Entropy | 8.08 bits | Energy spread normally |
+
+![Bearing 1-X Features](findings/D02_Bearing 1-x_02.png)
+
+**API tab** — `is_anomaly: false`, score 0.3314×:
+
+![Bearing 1-X API](findings/D03_Bearing1-x_03.png)
+
+---
+
+### Bearing 3-X — CRITICAL Anomaly Detected
+
+**Time Series** — anomaly score ramps from 0.3× and crosses the threshold at ~04:53, reaching **1.30×** at capture time. Red fill zone marks every window above alert threshold:
+
+![Bearing 3-X Time Series — CRITICAL](findings/D04_Bearing3-x_01+.png)
+
+**Features tab** — all indicators elevated vs healthy baseline:
+
+| Feature | Bearing 3-X | Bearing 1-X | Change |
+|---|---|---|---|
+| RMS | 0.1820 g | 0.0254 g | **+617%** |
+| Kurtosis | **8.29** | 3.15 | +163% |
+| Anomaly Score | **1.30×** | 0.33× | +294% |
+| Reconstruction Error | **1.1898 MSE** | 0.2831 MSE | +320% |
+| Crest Factor | **7.76** | 3.72 | +109% |
+| Spectral Entropy | 6.84 bits | 8.08 bits | −15% |
+
+![Bearing 3-X Features](findings/D05_Bearing3_x_02.png)
+
+**API tab** — `is_anomaly: true`, score 1.2992×, reconstruction error 1.1898:
+
+![Bearing 3-X API](findings/D06_Bearing3-x_03.png)
 
 ---
 
@@ -179,10 +223,10 @@ curl -X POST http://localhost:8000/predict \
 
 ```json
 {
-  "reconstruction_error": 0.5821,
+  "reconstruction_error": 1.189760,
   "threshold": 0.8542,
-  "is_anomaly": false,
-  "anomaly_score": 0.6812
+  "is_anomaly": true,
+  "anomaly_score": 1.2992
 }
 ```
 

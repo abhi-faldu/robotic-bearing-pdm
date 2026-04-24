@@ -207,15 +207,25 @@ curl http://localhost:8000/health
 
 See [`FINDINGS.md`](FINDINGS.md) for full training run outputs, plots, and comparison vs Isolation Forest baseline.
 
-### Visual Evidence
+### Live Dashboard — Anomaly Detection in Action
+
+**Bearing 3-X CRITICAL: anomaly score ramps past the μ+3σ threshold in real time**
+
+![Bearing 3-X Critical — Time Series](findings/D04_Bearing3-x_01+.png)
+
+**Bearing 3-X feature vector: RMS +617%, Kurtosis +163% vs healthy baseline**
+
+![Bearing 3-X Features](findings/D05_Bearing3_x_02.png)
+
+**Bearing 1-X healthy for comparison — score flat at 0.33×, is_anomaly: false**
+
+![Bearing 1-X API](findings/D03_Bearing1-x_03.png)
+
+### Training Evidence
 
 **Bearing degradation signal (RMS + Kurtosis over 7 days):**
 
 ![RMS and Kurtosis over Time](findings/07_RMS_and_Kurtosis_over_Time.png)
-
-**LSTM Autoencoder anomaly score — reconstruction error spikes 600,000× at failure:**
-
-![Anomaly Score Over Time](findings/18_bearing_Anomaly_score_over_time.png)
 
 **LSTM Autoencoder vs Isolation Forest — 123h vs ~72h detection lead time:**
 
