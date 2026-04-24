@@ -34,7 +34,7 @@ import streamlit as st
 
 API_URL       = os.getenv("API_URL", "http://localhost:8000")
 REFRESH_SECS  = 10          # auto-refresh interval
-THRESHOLD     = 0.0089      # fallback if API unavailable
+THRESHOLD     = 0.8542      # fallback if API unavailable (μ+3σ from training)
 HISTORY_LEN   = 144         # 24 h × 6 per hour (10-min snapshots)
 
 # ── Page config (must be first Streamlit call) ────────────────────────────────
@@ -332,21 +332,26 @@ def bearing_card_html(b: dict, selected: bool) -> str:
 
 def sidebar_footer_html(threshold: float, api_ok: bool) -> str:
     api_col   = "#3fb950" if api_ok else "#f85149"
-    api_label = "● online" if api_ok else "● offline"
-    return f"""
-    <div style="padding:12px 16px;border-top:1px solid #21262d;display:flex;
-                flex-direction:column;gap:6px;">
-      {''.join(f'''
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-size:10px;color:#8b949e;">{lbl}</span>
-          <span style="font-size:11px;color:{vc};font-weight:500;font-family:{ff};">{val}</span>
-        </div>''' for lbl, val, vc, ff in [
-            ("Model", "LSTM-AE v1.0", "#e6edf3", "'Inter',sans-serif"),
-            ("Threshold", str(threshold), "#f85149", "'JetBrains Mono',monospace"),
-            ("Latency", "< 20 ms", "#e6edf3", "'JetBrains Mono',monospace"),
-            ("API", api_label, api_col, "'Inter',sans-serif"),
-        ])}
-    </div>"""
+    api_label = "&#9679; online" if api_ok else "&#9679; offline"
+    def row(lbl, val, vc, ff):
+        return (
+            f'<div style="display:flex;justify-content:space-between;align-items:center;">'
+            f'<span style="font-size:10px;color:#8b949e;">{lbl}</span>'
+            f'<span style="font-size:11px;color:{vc};font-weight:500;font-family:{ff};">{val}</span>'
+            f'</div>'
+        )
+    inner = (
+        row("Model",     "LSTM-AE v1.0",            "#e6edf3", "Inter,sans-serif") +
+        row("Threshold", f"{threshold:.4f}",         "#f85149", "JetBrains Mono,monospace") +
+        row("Latency",   "&lt; 20 ms",               "#e6edf3", "JetBrains Mono,monospace") +
+        row("API",       api_label,                  api_col,   "Inter,sans-serif")
+    )
+    return (
+        '<div style="padding:12px 16px;border-top:1px solid #21262d;'
+        'display:flex;flex-direction:column;gap:6px;">'
+        + inner +
+        '</div>'
+    )
 
 
 def alert_banner_html(b: dict, clock: str) -> str:
@@ -623,19 +628,17 @@ def main() -> None:
 
     with tab_features:
         st.markdown(
-            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;">',
+            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;">'
+            + feature_detail_html(selected) + '</div>',
             unsafe_allow_html=True,
         )
-        st.markdown(feature_detail_html(selected), unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
     with tab_api:
         st.markdown(
-            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;">',
+            '<div style="background:#161b22;border:1px solid #30363d;border-radius:6px;padding:12px 16px;">'
+            + api_panel_html(selected) + '</div>',
             unsafe_allow_html=True,
         )
-        st.markdown(api_panel_html(selected), unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
     # Stat cards row
     st.markdown('<div style="display:flex;gap:10px;margin-top:12px;">', unsafe_allow_html=True)
@@ -645,9 +648,9 @@ def main() -> None:
     last_alert_col  = "#f85149" if crit_count > 0 else "#e6edf3"
 
     stat_data = [
-        ("Detection Lead Time",  "~6 hrs",      "before bearing failure",     "#58a6ff"),
+        ("Detection Lead Time",  "123 hrs",      "before bearing failure",     "#58a6ff"),
         ("False Positive Rate",  "< 5%",         "on healthy run data",        "#e6edf3"),
-        ("Model Parameters",     "~180K",        "LSTM Autoencoder",           "#e6edf3"),
+        ("Model Parameters",     "150,460",      "LSTM Autoencoder",           "#e6edf3"),
         ("Last Alert",           last_alert_val, last_alert_sub,               last_alert_col),
     ]
     for col, (label, value, sub, vc) in zip(cols, stat_data):
