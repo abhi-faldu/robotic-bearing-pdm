@@ -1,35 +1,44 @@
-# 🔩 robotic-bearing-pdm
+<div align="center">
 
-> **Predictive Maintenance for Industrial Robotic Arms**  
-> Detecting bearing failures before they happen — using LSTM Autoencoders on real NASA sensor data.
+# ⚙️ robotic-bearing-pdm
+
+**End-to-end predictive maintenance for industrial robotic arm bearings**  
+**using LSTM Autoencoder anomaly detection on NASA IMS sensor data**
+
+[![License: MIT](https://img.shields.io/badge/LICENSE-MIT-green?style=flat-square)](LICENSE)
+[![Python](https://img.shields.io/badge/PYTHON-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![PyTorch](https://img.shields.io/badge/PYTORCH-2.3-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/DASHBOARD-Streamlit-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Testing](https://img.shields.io/badge/TESTING-pytest-0A9EDC?style=flat-square&logo=pytest&logoColor=white)](https://pytest.org)
+[![Docker](https://img.shields.io/badge/CONTAINER-Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
+
+[Quick Start](#-quickstart) · [Dataset](#-dataset) · [Architecture](#-model-architecture) · [Results](#-results) · [API](#-api-usage) · [Docker](#-docker)
+
+</div>
 
 ---
 
-## 🏭 Real-World Problem
+## 🏭 Problem
 
-German automotive manufacturers like **BMW**, **Audi**, and **Mercedes-Benz** rely on thousands
-of industrial robotic arms on their production lines. A single unexpected bearing failure can halt
-an entire assembly line, costing upwards of **€500,000 per hour** in downtime.
+German automotive manufacturers like **BMW**, **Audi**, and **Mercedes-Benz** rely on thousands of industrial robotic arms. A single unexpected bearing failure halts an entire assembly line — costing up to **€500,000 per hour** in downtime.
 
-Current industry practice is mostly **scheduled maintenance** — replacing parts on a fixed
-calendar, regardless of actual condition. This project explores a smarter alternative:
-**condition-based predictive maintenance**, where a machine learning model continuously monitors
-sensor signals and raises an alert before a failure occurs.
+Today most factories use **scheduled maintenance** — replacing parts on a fixed calendar regardless of actual condition. This project replaces that with **condition-based predictive maintenance**: an ML model that monitors live sensor signals and raises an alert ~6 hours before failure.
 
 ---
 
 ## 🎯 What This Project Does
 
-This end-to-end pipeline:
-
-1. **Ingests** real vibration sensor data from NASA's IMS Bearing dataset
-2. **Engineers features** from raw time-series signals (RMS, kurtosis, peak-to-peak amplitude)
-3. **Trains an LSTM Autoencoder** on healthy bearing data only (unsupervised approach — no failure
-   labels required)
-4. **Detects anomalies** by measuring reconstruction error against a learned threshold
-5. **Serves predictions** via a REST API (FastAPI)
-6. **Visualises** live anomaly scores and sensor health in a Streamlit dashboard
-7. **Packages everything** in Docker Compose for one-command deployment
+| Step | Description |
+|------|-------------|
+| **Ingest** | Load NASA IMS vibration snapshots (20 kHz, 10-min intervals) |
+| **Extract** | Time-domain features: RMS, kurtosis, crest factor, peak-to-peak, skewness |
+| **Extract** | Frequency-domain features: FFT band energies, spectral entropy, dominant frequency |
+| **Train** | LSTM Autoencoder on healthy bearing data only — no failure labels required |
+| **Detect** | Reconstruction error > μ + 3σ triggers anomaly alert |
+| **Serve** | FastAPI REST endpoint — `POST /predict` returns score + flag in < 20 ms |
+| **Visualise** | Streamlit SCADA-style dark dashboard with live anomaly score chart |
+| **Deploy** | Docker Compose — one command to spin up API + Dashboard |
 
 ---
 
@@ -37,225 +46,252 @@ This end-to-end pipeline:
 
 ```
 robotic-bearing-pdm/
-│
-├── data/                        # Raw and processed sensor data
-│   ├── raw/                     # NASA IMS dataset (download separately — see below)
-│   └── processed/               # Preprocessed .parquet files
-│
+├── data/
+│   ├── raw/                        ← NASA IMS dataset (or synthetic — see below)
+│   └── processed/                  ← Feature matrix, windows, scaler
 ├── notebooks/
-│   ├── 01_eda.ipynb             # Exploratory data analysis
-│   ├── 02_feature_engineering.ipynb
-│   └── 03_model_training.ipynb  # LSTM Autoencoder training + evaluation
-│
+│   ├── 01_eda.ipynb                ← Signal visualisation + failure zone ID
+│   ├── 02_feature_engineering.ipynb← Full feature pipeline + normalisation
+│   └── 03_model_training.ipynb     ← Train, evaluate, compare vs Isolation Forest
+├── scripts/
+│   └── generate_synthetic_data.py  ← Generate NASA-like data (no download needed)
 ├── src/
 │   ├── data/
-│   │   ├── loader.py            # Dataset ingestion and windowing
-│   │   └── features.py          # RMS, kurtosis, FFT feature extraction
+│   │   ├── loader.py               ← Dataset ingestion + sliding windows
+│   │   └── features.py             ← Feature extraction + scaler
 │   ├── models/
-│   │   ├── lstm_autoencoder.py  # Model architecture (PyTorch)
-│   │   └── threshold.py         # Anomaly threshold calculation
+│   │   ├── lstm_autoencoder.py     ← PyTorch LSTM Autoencoder
+│   │   ├── threshold.py            ← μ + 3σ threshold calibration
+│   │   └── train.py                ← CLI training script
 │   └── api/
-│       ├── main.py              # FastAPI inference endpoint
-│       └── schemas.py           # Pydantic request/response models
-│
+│       ├── main.py                 ← FastAPI inference service
+│       └── schemas.py              ← Pydantic request/response models
 ├── dashboard/
-│   └── app.py                   # Streamlit live dashboard
-│
+│   └── app.py                      ← Streamlit live dashboard
 ├── tests/
-│   └── test_features.py
-│
-├── docker-compose.yml
+│   ├── test_features.py
+│   ├── test_model.py
+│   └── test_api.py
+├── findings/                       ← Generated plots + FINDINGS.md
 ├── Dockerfile.api
 ├── Dockerfile.dashboard
-├── requirements.txt
-└── README.md
+├── docker-compose.yml
+└── requirements.txt
 ```
 
 ---
 
 ## 📊 Dataset
 
-This project uses the **NASA IMS Bearing Dataset** from the Center for Intelligent Maintenance
-Systems (IMS), University of Cincinnati.
+**NASA IMS Bearing Dataset** — Center for Intelligent Maintenance Systems, University of Cincinnati.
 
-**Download:**
 ```bash
-# Option 1 — Kaggle CLI
+# Option A — Kaggle CLI (recommended)
 kaggle datasets download -d vinayak123tyagi/bearing-dataset -p data/raw/ --unzip
 
-# Option 2 — Direct download from NASA Prognostics Repository
-# https://data.nasa.gov/Aeospace/CMAPSS-Jet-Engine-Simulated-Data/ff5v-kuh6
+# Option B — Synthetic data (no download, runs immediately)
+python scripts/generate_synthetic_data.py
 ```
 
-**Dataset structure:** Three run-to-failure experiments. Each file contains accelerometer
-readings from 4 bearings sampled at 20 kHz. Readings taken every 10 minutes until failure.
+| Property | Value |
+|---|---|
+| Sampling rate | 20 kHz |
+| Snapshot interval | 10 minutes |
+| Dataset 2 duration | 7 days |
+| Bearings | 4 (Bearing 1 → inner race failure, Bearing 2 → outer race failure) |
+| Files | ~984 snapshots |
+
+> ✅ **Synthetic data generates an identical file structure** to the real dataset so the full pipeline runs without any downloads.
 
 ---
 
 ## 🧠 Model Architecture
 
 ```
-Input: [batch, seq_len=50, features=8]
-        ↓
-   LSTM Encoder  (hidden=64, layers=2)
-        ↓
-   Latent space  (dim=32)
-        ↓
-   LSTM Decoder  (hidden=64, layers=2)
-        ↓
-Output: [batch, seq_len=50, features=8]
+Input  [batch, seq_len=50, n_features=44]
+          │
+    ┌─────▼──────┐
+    │  Encoder   │  2-layer LSTM  →  Linear  →  latent dim=32
+    └─────┬──────┘
+          │  z  (bottleneck)
+    ┌─────▼──────┐
+    │  Decoder   │  Linear  →  repeat(seq_len)  →  2-layer LSTM  →  Linear
+    └─────┬──────┘
+          │
+Output [batch, seq_len=50, n_features=44]
 
-Anomaly Score = Mean Squared Reconstruction Error
-Alert if score > μ_train + 3σ_train
+Anomaly Score  =  MSE(input, reconstruction)
+Alert          =  score  >  μ_train + 3σ_train
 ```
 
-The model is trained **only on healthy data** from the first 20% of Dataset 2 (before any
-degradation begins). It learns to reconstruct normal operating patterns. When a bearing starts
-to degrade, reconstruction error rises — this is the anomaly signal.
+**Why unsupervised?** Bearing failures are rare events — labelled failure data barely exists in practice. Training only on healthy data means the model works out-of-the-box on any new machine.
 
 ---
 
 ## 🚀 Quickstart
 
-### Prerequisites
-- Docker + Docker Compose
-- Python 3.10+
-- NASA IMS dataset downloaded to `data/raw/`
-
-### Run the full stack
+### 1 — Clone & install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/robotic-bearing-pdm.git
+git clone https://github.com/abhi-faldu/robotic-bearing-pdm.git
 cd robotic-bearing-pdm
-
-# Download data (see Dataset section above)
-
-# Train the model (first time only)
 pip install -r requirements.txt
-python -m src.models.train
-
-# Launch API + Dashboard
-docker-compose up --build
 ```
 
-| Service     | URL                        |
-|-------------|---------------------------|
-| FastAPI docs | http://localhost:8000/docs |
-| Dashboard   | http://localhost:8501      |
+### 2 — Generate data (or use real NASA dataset)
 
-### API usage
+```bash
+python scripts/generate_synthetic_data.py   # ~30 seconds, no internet needed
+```
+
+### 3 — Train the model
+
+```bash
+python -m src.models.train
+# Outputs: models/lstm_autoencoder.pt  models/threshold.json  models/scaler.npz
+```
+
+### 4 — Launch API + Dashboard
+
+```bash
+docker compose up --build
+```
+
+| Service | URL |
+|---|---|
+| FastAPI docs | http://localhost:8000/docs |
+| Live dashboard | http://localhost:8501 |
+
+---
+
+## 🌐 API Usage
 
 ```python
 import requests
 
-payload = {
-    "bearing_id": "bearing_1_x",
-    "sensor_readings": [0.012, -0.003, 0.021, ...]  # 50 timesteps × 8 features
-}
-
-response = requests.post("http://localhost:8000/predict", json=payload)
+response = requests.post(
+    "http://localhost:8000/predict",
+    json={"window": [[...50 rows × 44 features, z-score normalised...]]}
+)
 print(response.json())
-# {"anomaly_score": 0.0043, "is_anomaly": false, "threshold": 0.0089}
+```
+
+```json
+{
+  "reconstruction_error": 0.0043,
+  "threshold": 0.0089,
+  "is_anomaly": false,
+  "anomaly_score": 0.4831
+}
+```
+
+```bash
+# Health check
+curl http://localhost:8000/health
+# {"status":"ok","model_loaded":true,"threshold":0.0089}
 ```
 
 ---
 
 ## 📈 Results
 
-| Metric                     | Value   |
-|----------------------------|---------|
-| Detection lead time        | ~6 hrs before failure |
-| False positive rate        | < 5%    |
-| Model parameters           | ~180K   |
-| Inference latency          | < 20 ms |
+| Metric | Value |
+|---|---|
+| Detection lead time | **~6 hours** before bearing failure |
+| False positive rate | **< 5%** on healthy run data |
+| Model parameters | **~180K** |
+| Inference latency | **< 20 ms** per window |
+| Training data | First 20% of run (healthy only) |
 
-Anomaly scores across the full run-to-failure timeline:
+See [`FINDINGS.md`](FINDINGS.md) for full training run outputs, plots, and comparison vs Isolation Forest baseline.
 
+---
+
+## 🐳 Docker
+
+```bash
+# Full stack (API + dashboard)
+docker compose up --build
+
+# API only
+docker build -f Dockerfile.api -t bearing-pdm-api .
+docker run -p 8000:8000 -v $(pwd)/models:/app/models bearing-pdm-api
+
+# Dashboard only
+docker build -f Dockerfile.dashboard -t bearing-pdm-dashboard .
+docker run -p 8501:8501 bearing-pdm-dashboard
 ```
-Normal operation     │▁▁▁▁▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁│  Score: 0.002–0.005
-Early degradation    │▁▁▂▂▃▂▂▃▄▃▄▄▅▄▅▅▅▆▆│  Score: 0.010–0.030
-Failure imminent     │▆▇▇▇███████████████│  Score: > threshold
+
+---
+
+## 🧪 Tests
+
+```bash
+pytest tests/ -v
+# test_features.py  — 25 unit tests (RMS, kurtosis, FFT, scaler)
+# test_model.py     — 10 unit tests (shapes, gradients, threshold, save/load)
+# test_api.py       — 20 unit tests (FastAPI endpoints, schema validation)
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer           | Technology                        |
-|-----------------|-----------------------------------|
-| ML Framework    | PyTorch                           |
-| Data Processing | pandas, NumPy, SciPy              |
-| Feature Eng.    | tsfresh, custom signal processing |
-| API             | FastAPI + Uvicorn                 |
-| Dashboard       | Streamlit + Plotly                |
-| Containerisation| Docker, Docker Compose            |
-| Testing         | pytest                            |
+| Layer | Technology |
+|---|---|
+| ML Framework | PyTorch 2.3 |
+| Data Processing | pandas, NumPy, SciPy |
+| Feature Engineering | Custom signal processing (time + frequency domain) |
+| API | FastAPI + Uvicorn |
+| Dashboard | Streamlit + Plotly |
+| Containerisation | Docker, Docker Compose |
+| Testing | pytest |
+| Baseline | scikit-learn Isolation Forest |
 
 ---
 
 ## 🔬 Methodology
 
-### Why LSTM Autoencoder?
+### Feature Engineering (11 features × 4 bearings = 44 raw + rolling)
 
-- **No labelled failure data required** — failure events are rare and expensive to collect.
-  Training on normal data only makes this approach applicable out of the box.
-- **Captures temporal dependencies** — bearing degradation is a sequential process; LSTMs
-  model the time-dependency between sensor readings.
-- **Interpretable threshold** — reconstruction error is intuitive and explainable to
-  maintenance engineers.
-
-### Feature Engineering
-
-| Feature            | Description                                  |
-|--------------------|----------------------------------------------|
-| RMS                | Root Mean Square — overall vibration energy  |
-| Kurtosis           | Impulsive spike sensitivity                  |
-| Peak-to-peak       | Max amplitude range                          |
-| Crest factor       | Peak / RMS ratio                             |
-| FFT magnitude      | Frequency domain energy at key bands         |
-| Rolling mean/std   | Short-term trend features (window=10)        |
+| Feature | Domain | What it captures |
+|---|---|---|
+| RMS | Time | Overall vibration energy — rises as bearing deteriorates |
+| Kurtosis | Time | Impulsiveness — spikes sharply on surface defects |
+| Crest Factor | Time | Peak/RMS — sensitive to early-stage pitting |
+| Peak-to-Peak | Time | Signal range — increases with spalling |
+| Skewness | Time | Signal asymmetry — changes with damaged geometry |
+| Shape Factor | Time | Distributed vs. localised fault indicator |
+| Band Energy ×3 | Frequency | Energy in 0–1 kHz, 1–5 kHz, 5–10 kHz bands |
+| Spectral Entropy | Frequency | Energy spread — low when defect frequencies dominate |
+| Dominant Frequency | Frequency | Hz of peak magnitude bin |
+| Rolling mean/std | Rolling | 2h + 6h trends on top 3 features |
 
 ---
 
 ## 📚 References
 
-- Lee, J., Qiu, H., Yu, G., Lin, J. (2007). *IMS Bearing Dataset*. NASA Prognostics
-  Data Repository, NASA Ames Research Center.
-- Malhotra, P. et al. (2016). *LSTM-based Encoder-Decoder for Multi-Sensor Anomaly Detection*.
-  arXiv:1607.00148.
-- Nectoux, P. et al. (2012). *PRONOSTIA: An Experimental Platform for Bearings Accelerated
-  Life Test*. IEEE PHM Conference, Denver.
+- Lee, J., Qiu, H., Yu, G., Lin, J. (2007). *IMS Bearing Dataset*. NASA Prognostics Data Repository.
+- Malhotra, P. et al. (2016). *LSTM-based Encoder-Decoder for Multi-Sensor Anomaly Detection*. arXiv:1607.00148.
+- Nectoux, P. et al. (2012). *PRONOSTIA: An Experimental Platform for Bearings Accelerated Life Test*. IEEE PHM.
 
 ---
 
 ## 🗺️ Roadmap
 
-- [x] EDA notebooks
-- [x] LSTM Autoencoder training pipeline
+- [x] EDA + feature engineering notebooks
+- [x] LSTM Autoencoder (PyTorch)
 - [x] FastAPI inference service
-- [x] Streamlit dashboard
+- [x] Streamlit SCADA dashboard (BearingPDM design system)
 - [x] Docker Compose deployment
-- [ ] Comparison: Isolation Forest vs One-Class SVM vs LSTM-AE
-- [ ] Synthetic data generator (no dataset download needed)
-- [ ] Grafana + InfluxDB integration (preview of Project 02)
+- [x] Synthetic data generator
+- [x] FINDINGS.md with training evidence
+- [ ] Project 2 — IIoT MQTT simulator (iiot-smart-factory-sim)
+- [ ] Project 3 — MLOps pipeline with MLflow + Evidently AI
 
 ---
 
-## 🤝 Inspiration
-
-- [taneishi/BearingFailures](https://github.com/taneishi/BearingFailures)
-- [BLarzalere/LSTM-Autoencoder-for-Anomaly-Detection](https://github.com/BLarzalere/LSTM-Autoencoder-for-Anomaly-Detection)
-- [jieunparklee/predictive-maintenance](https://github.com/jieunparklee/predictive-maintenance)
-
----
-
-## 📄 License
-
-MIT License — free to use, modify, and distribute.
-
----
-
-<p align="center">
-  Built as part of a portfolio exploring Industry 4.0 challenges in German automotive manufacturing.<br>
-  Inspired by real predictive maintenance problems at BMW, Audi, and Mercedes-Benz.
-</p>
+<div align="center">
+  <sub>Built as part of a portfolio targeting Industry 4.0 internships at German automotive companies.<br>
+  Inspired by predictive maintenance challenges at BMW, Audi, and Mercedes-Benz.</sub>
+</div>
