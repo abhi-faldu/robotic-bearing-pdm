@@ -303,17 +303,15 @@ pytest tests/ -v
 
 ---
 
-## 🗺️ Roadmap
+## ✅ What's Built
 
 - [x] EDA + feature engineering notebooks
-- [x] LSTM Autoencoder (PyTorch)
+- [x] LSTM Autoencoder (PyTorch) — 150,460 parameters
 - [x] FastAPI inference service
 - [x] Streamlit SCADA dashboard (BearingPDM design system)
 - [x] Docker Compose deployment
-- [x] Synthetic data generator
-- [x] FINDINGS.md with training evidence
-- [ ] Project 2 — IIoT MQTT simulator (iiot-smart-factory-sim)
-- [ ] Project 3 — MLOps pipeline with MLflow + Evidently AI
+- [x] Synthetic data generator (no Kaggle download needed)
+- [x] Full training evidence in FINDINGS.md with real metrics
 
 ---
 
