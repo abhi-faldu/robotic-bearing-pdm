@@ -1,0 +1,56 @@
+# ── docker-compose.yml ────────────────────────────────────────────────────────
+# Starts two services:
+#   api       — FastAPI inference service  (port 8000)
+#   dashboard — Streamlit live dashboard   (port 8501)
+#
+# Usage:
+#   docker compose up --build          # first run
+#   docker compose up                  # subsequent runs
+#   docker compose down                # stop and remove containers
+#
+# Prerequisites:
+#   - Train the model first: python -m src.models.train
+#   - Artefacts must exist in ./models/ before starting containers
+
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: bearing-pdm-api:latest
+    container_name: bearing-pdm-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount trained model artefacts at runtime — no need to rebuild image after retraining
+      - ./models:/app/models:ro
+    environment:
+      MODEL_PATH:     models/lstm_autoencoder.pt
+      THRESHOLD_PATH: models/threshold.json
+      SCALER_PATH:    models/scaler.npz
+      DEVICE:         cpu
+      SEQ_LEN:        "50"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    image: bearing-pdm-dashboard:latest
+    container_name: bearing-pdm-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      # Points the dashboard at the api service using Docker's internal DNS
+      API_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
