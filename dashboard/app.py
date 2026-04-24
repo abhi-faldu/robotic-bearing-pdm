@@ -432,41 +432,57 @@ def feature_detail_html(b: dict) -> str:
 
 
 def api_panel_html(b: dict) -> str:
-    is_anom   = b["score"] >= 1.0
-    anom_col  = "#f85149" if is_anom else "#3fb950"
-    err_border= "rgba(248,81,73,0.4)" if is_anom else "#30363d"
-    return f"""
-    <div style="padding:16px 0;display:flex;flex-direction:column;gap:12px;">
-      <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">
-        <div style="flex:1;min-width:280px;">
-          <div style="font-size:10px;color:#8b949e;margin-bottom:6px;font-weight:600;
-                      letter-spacing:0.06em;text-transform:uppercase;">POST /predict</div>
-          <pre style="background:#21262d;border:1px solid #30363d;border-radius:6px;
-                      padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;
-                      color:#e6edf3;line-height:1.6;overflow:auto;">{json.dumps({"window": [[0.012, -0.003, 0.021, "..."]]}, indent=2)}</pre>
-        </div>
-        <div style="flex:1;min-width:280px;">
-          <div style="font-size:10px;color:#8b949e;margin-bottom:6px;font-weight:600;
-                      letter-spacing:0.06em;text-transform:uppercase;">Response</div>
-          <pre style="background:#21262d;border:1px solid {err_border};border-radius:6px;
-                      padding:14px;font-family:'JetBrains Mono',monospace;font-size:11px;
-                      line-height:1.6;overflow:auto;">
-<span style="color:#8b949e">{{</span>
-<span style="color:#8b949e">  "reconstruction_error": </span><span style="color:#58a6ff">{b['error']:.6f}</span><span style="color:#8b949e">,</span>
-<span style="color:#8b949e">  "threshold": </span><span style="color:#e6edf3">{b['threshold']}</span><span style="color:#8b949e">,</span>
-<span style="color:#8b949e">  "is_anomaly": </span><span style="color:{anom_col}">{str(is_anom).lower()}</span><span style="color:#8b949e">,</span>
-<span style="color:#8b949e">  "anomaly_score": </span><span style="color:{anom_col if is_anom else '#58a6ff'}">{b['score']:.4f}</span>
-<span style="color:#8b949e">}}</span>
-          </pre>
-        </div>
-      </div>
-      <div style="font-size:12px;color:#8b949e;background:#21262d;border-radius:6px;
-                  padding:10px 14px;font-family:'JetBrains Mono',monospace;">
-        GET /health → <span style="color:#3fb950">"status": "ok"</span>
-        · <span style="color:#e6edf3">model_loaded: true</span>
-        · threshold: <span style="color:#f85149">{b['threshold']}</span>
-      </div>
-    </div>"""
+    is_anom    = b["score"] >= 1.0
+    anom_col   = "#f85149" if is_anom else "#3fb950"
+    err_border = "rgba(248,81,73,0.4)" if is_anom else "#30363d"
+    score_col  = anom_col if is_anom else "#58a6ff"
+    box = (
+        "background:#21262d;border-radius:6px;padding:14px;"
+        "font-family:JetBrains Mono,monospace;font-size:11px;"
+        "color:#e6edf3;line-height:1.8;overflow:auto;"
+    )
+    req = (
+        '<span style="color:#8b949e">{</span><br>'
+        '&nbsp;&nbsp;<span style="color:#79c0ff">"window"</span>'
+        '<span style="color:#8b949e">: [[0.012, -0.003, 0.021, <i>...50×92</i>]]</span><br>'
+        '<span style="color:#8b949e">}</span>'
+    )
+    resp = (
+        '<span style="color:#8b949e">{</span><br>'
+        f'&nbsp;&nbsp;<span style="color:#79c0ff">"reconstruction_error"</span>'
+        f'<span style="color:#8b949e">: </span><span style="color:#58a6ff">{b["error"]:.6f}</span><span style="color:#8b949e">,</span><br>'
+        f'&nbsp;&nbsp;<span style="color:#79c0ff">"threshold"</span>'
+        f'<span style="color:#8b949e">: </span><span style="color:#e6edf3">{b["threshold"]}</span><span style="color:#8b949e">,</span><br>'
+        f'&nbsp;&nbsp;<span style="color:#79c0ff">"is_anomaly"</span>'
+        f'<span style="color:#8b949e">: </span><span style="color:{anom_col}">{str(is_anom).lower()}</span><span style="color:#8b949e">,</span><br>'
+        f'&nbsp;&nbsp;<span style="color:#79c0ff">"anomaly_score"</span>'
+        f'<span style="color:#8b949e">: </span><span style="color:{score_col}">{b["score"]:.4f}</span><br>'
+        '<span style="color:#8b949e">}</span>'
+    )
+    label = (
+        "font-size:10px;color:#8b949e;margin-bottom:6px;"
+        "font-weight:600;letter-spacing:0.06em;text-transform:uppercase;"
+    )
+    return (
+        '<div style="padding:16px 0;display:flex;flex-direction:column;gap:12px;">'
+          '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">'
+            f'<div style="flex:1;min-width:260px;">'
+              f'<div style="{label}">POST /predict</div>'
+              f'<div style="{box}border:1px solid #30363d;">{req}</div>'
+            '</div>'
+            f'<div style="flex:1;min-width:260px;">'
+              f'<div style="{label}">Response</div>'
+              f'<div style="{box}border:1px solid {err_border};">{resp}</div>'
+            '</div>'
+          '</div>'
+          f'<div style="font-size:12px;color:#8b949e;background:#21262d;border-radius:6px;'
+          f'padding:10px 14px;font-family:JetBrains Mono,monospace;">'
+            f'GET /health &rarr; <span style="color:#3fb950">"status": "ok"</span>'
+            f' &middot; <span style="color:#e6edf3">model_loaded: true</span>'
+            f' &middot; threshold: <span style="color:#f85149">{b["threshold"]}</span>'
+          '</div>'
+        '</div>'
+    )
 
 
 # ── Plotly anomaly chart ───────────────────────────────────────────────────────
