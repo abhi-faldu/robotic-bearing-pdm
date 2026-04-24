@@ -1,0 +1,49 @@
+# ── Dockerfile.api ────────────────────────────────────────────────────────────
+# FastAPI inference service for the LSTM Autoencoder bearing anomaly detector.
+#
+# Build:  docker build -f Dockerfile.api -t bearing-pdm-api .
+# Run:    docker run -p 8000:8000 -v $(pwd)/models:/app/models bearing-pdm-api
+
+FROM python:3.11-slim AS base
+
+# System dependencies (no build tools needed — torch ships pre-compiled wheels)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ── Install Python dependencies (layer-cached) ────────────────────────────────
+COPY requirements.txt .
+RUN pip install --no-cache-dir \
+        torch==2.3.0 --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir \
+        fastapi==0.111.0 \
+        uvicorn[standard]==0.29.0 \
+        pydantic==2.7.1 \
+        numpy==1.26.4 \
+        scipy==1.13.0 \
+        loguru==0.7.2 \
+        python-dotenv==1.0.1
+
+# ── Copy source code ──────────────────────────────────────────────────────────
+COPY src/ ./src/
+
+# Model artefacts are mounted at runtime via docker-compose volume,
+# not baked into the image (keeps image lean, allows hot-swapping weights)
+# Expected mount: ./models → /app/models
+
+# ── Runtime configuration ─────────────────────────────────────────────────────
+ENV MODEL_PATH=models/lstm_autoencoder.pt \
+    THRESHOLD_PATH=models/threshold.json \
+    SCALER_PATH=models/scaler.npz \
+    DEVICE=cpu \
+    SEQ_LEN=50
+
+EXPOSE 8000
+
+# Healthcheck — hits /health every 30 s; marks container unhealthy after 3 failures
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
