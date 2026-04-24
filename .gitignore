@@ -24,7 +24,7 @@ data/processed/*
 !data/processed/.gitkeep
 
 # ── Trained model artifacts ───────────────────────────────────────────────────
-models/
+/models/
 *.pt
 *.pth
 *.ckpt
