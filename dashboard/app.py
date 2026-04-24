@@ -393,55 +393,36 @@ def stat_card_html(label: str, value: str, sub: str, value_color: str = "#e6edf3
 
 
 def api_panel_html(b: dict) -> str:
-    is_anom    = b["score"] >= 1.0
-    anom_col   = "#f85149" if is_anom else "#3fb950"
-    err_border = "rgba(248,81,73,0.4)" if is_anom else "#30363d"
-    score_col  = anom_col if is_anom else "#58a6ff"
-    box = (
-        "background:#21262d;border-radius:6px;padding:14px;"
-        "font-family:JetBrains Mono,monospace;font-size:11px;"
-        "color:#e6edf3;line-height:1.8;overflow:auto;"
-    )
-    req = (
-        '<span style="color:#8b949e">{</span><br>'
-        '&nbsp;&nbsp;<span style="color:#79c0ff">"window"</span>'
-        '<span style="color:#8b949e">: [[0.012, -0.003, 0.021, <i>...50×92</i>]]</span><br>'
-        '<span style="color:#8b949e">}</span>'
-    )
-    resp = (
-        '<span style="color:#8b949e">{</span><br>'
-        f'&nbsp;&nbsp;<span style="color:#79c0ff">"reconstruction_error"</span>'
-        f'<span style="color:#8b949e">: </span><span style="color:#58a6ff">{b["error"]:.6f}</span><span style="color:#8b949e">,</span><br>'
-        f'&nbsp;&nbsp;<span style="color:#79c0ff">"threshold"</span>'
-        f'<span style="color:#8b949e">: </span><span style="color:#e6edf3">{b["threshold"]}</span><span style="color:#8b949e">,</span><br>'
-        f'&nbsp;&nbsp;<span style="color:#79c0ff">"is_anomaly"</span>'
-        f'<span style="color:#8b949e">: </span><span style="color:{anom_col}">{str(is_anom).lower()}</span><span style="color:#8b949e">,</span><br>'
-        f'&nbsp;&nbsp;<span style="color:#79c0ff">"anomaly_score"</span>'
-        f'<span style="color:#8b949e">: </span><span style="color:{score_col}">{b["score"]:.4f}</span><br>'
-        '<span style="color:#8b949e">}</span>'
-    )
-    label = (
-        "font-size:10px;color:#8b949e;margin-bottom:6px;"
-        "font-weight:600;letter-spacing:0.06em;text-transform:uppercase;"
+    is_anom  = b["score"] >= 1.0
+    anom_col = "#f85149" if is_anom else "#3fb950"
+    rows = [
+        ("Bearing",              b["name"],                    "#e6edf3"),
+        ("Reconstruction Error", f'{b["error"]:.6f}',          "#58a6ff"),
+        ("Threshold",            f'{b["threshold"]}',          "#e6edf3"),
+        ("Anomaly Score",        f'{b["score"]:.4f}&times;',   anom_col),
+        ("Is Anomaly",           str(is_anom).lower(),         anom_col),
+    ]
+    def row(lbl, val, vc):
+        return (
+            f'<div style="display:flex;justify-content:space-between;align-items:center;'
+            f'padding:8px 0;border-bottom:1px solid #21262d;">'
+            f'<span style="font-size:11px;color:#8b949e;">{lbl}</span>'
+            f'<span style="font-size:11px;color:{vc};font-family:JetBrains Mono,monospace;font-weight:600;">{val}</span>'
+            f'</div>'
+        )
+    inner = "".join(row(l, v, c) for l, v, c in rows)
+    health = (
+        f'<div style="margin-top:12px;font-size:11px;color:#8b949e;'
+        f'background:#21262d;border-radius:6px;padding:10px 14px;'
+        f'font-family:JetBrains Mono,monospace;">'
+        f'GET /health &rarr; <span style="color:#3fb950">"status": "ok"</span>'
+        f' &middot; <span style="color:#e6edf3">model_loaded: true</span>'
+        f' &middot; threshold: <span style="color:#f85149">{b["threshold"]}</span>'
+        f'</div>'
     )
     return (
-        '<div style="padding:16px 0;display:flex;flex-direction:column;gap:12px;">'
-          '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;">'
-            f'<div style="flex:1;min-width:260px;">'
-              f'<div style="{label}">POST /predict</div>'
-              f'<div style="{box}border:1px solid #30363d;">{req}</div>'
-            '</div>'
-            f'<div style="flex:1;min-width:260px;">'
-              f'<div style="{label}">Response</div>'
-              f'<div style="{box}border:1px solid {err_border};">{resp}</div>'
-            '</div>'
-          '</div>'
-          f'<div style="font-size:12px;color:#8b949e;background:#21262d;border-radius:6px;'
-          f'padding:10px 14px;font-family:JetBrains Mono,monospace;">'
-            f'GET /health &rarr; <span style="color:#3fb950">"status": "ok"</span>'
-            f' &middot; <span style="color:#e6edf3">model_loaded: true</span>'
-            f' &middot; threshold: <span style="color:#f85149">{b["threshold"]}</span>'
-          '</div>'
+        '<div style="padding:12px 0;">'
+        + inner + health +
         '</div>'
     )
 
