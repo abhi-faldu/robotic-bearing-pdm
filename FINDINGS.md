@@ -14,20 +14,72 @@
 | Snapshots | 984 files · 10-min intervals · 7 days |
 | Training window | First 20% (healthy) = ~196 snapshots |
 | Features per bearing | 11 (6 time-domain + 5 frequency-domain) |
-| Bearings | 4 → 44 raw features + 24 rolling = **68 total** |
+| Bearings | 4 → **92 total features** (raw + rolling stats) |
+| Train windows | **147** (seq_len=50, shape 147×50×92) |
+| Test windows | **739** |
 | Sequence length | 50 snapshots (~8.3 hours per window) |
 | Hidden dim | 64 |
 | Latent dim | 32 |
 | Layers | 2 LSTM layers (encoder + decoder) |
-| Parameters | ~180K |
+| Parameters | **150,460** |
 | Optimiser | Adam lr=1e-3 |
 | Epochs | 50 |
 | Batch size | 64 |
-| Threshold | μ_train + 3σ_train |
+| Best training loss | **0.5678** (MSE, epoch 50) |
+| Train error μ / σ | **0.5573 / 0.0990** |
+| Threshold (μ+3σ) | **0.8542** |
 
 ---
 
-## 2 · Training Loss
+## 2 · Exploratory Data Analysis
+
+### Raw Vibration Waveforms
+Three snapshots: healthy (early), mid-run, and near-failure — the amplitude envelope visibly widens as the bearing degrades.
+
+![Raw Waveforms](findings/06_raw_vibration_Waveforms.png)
+
+### RMS & Kurtosis Over Time
+RMS (overall energy) and kurtosis (impulsiveness) are the two strongest early-warning indicators. Both rise sharply in the final 2 days.
+
+![RMS and Kurtosis Over Time](findings/07_RMS_and_Kurtosis_over_Time.png)
+
+### Power Spectral Density — Healthy vs Near-Failure
+PSD shows characteristic defect frequencies emerge in the 1–5 kHz band as the inner race begins to pit.
+
+![Average PSD](findings/09_Average_power_spectral_density.png)
+
+---
+
+## 3 · Feature Engineering
+
+### Bearing 1 — All Feature Trends
+All 11 extracted features across the full 7-day run for the failing bearing. RMS, crest factor, and kurtosis diverge earliest.
+
+![Bearing 1 All Features](findings/08_Bearing1_All_Feature_trends.png)
+
+### RMS Trend with Anomaly Threshold
+RMS plotted alongside the μ+3σ threshold — shows how early individual features breach the alert line before the full reconstruction error does.
+
+![RMS with Threshold](findings/10_RMS_trend_with_anomaly_threshold.png)
+
+### Feature Correlation Matrix
+High correlation between same-domain features across bearings confirms the feature extraction is consistent. Low cross-bearing correlation confirms independence.
+
+![Feature Correlation Matrix](findings/11_feature_correlation_matrix.png)
+
+### Bearing 1 Feature Distributions — Healthy vs Degraded
+Each feature shifts distribution significantly between the healthy phase and the failure zone, validating their discriminative power.
+
+![Feature Distributions](findings/12_Bearing1_Feature_Distributions.png)
+
+### RMS with Rolling Averages (2h + 6h)
+Rolling statistics smooth out sensor noise and expose the underlying degradation trend that the LSTM learns to reconstruct.
+
+![RMS Rolling Averages](findings/14_RMS_plus_Rolling_Averages.png)
+
+---
+
+## 4 · Training Loss
 
 The loss converges within ~20 epochs on healthy data, indicating the model successfully
 learned the normal operating pattern before any degradation begins.
@@ -45,7 +97,7 @@ The red dashed line marks the **μ + 3σ threshold** — the alert boundary.
 
 ---
 
-## 4 · Anomaly Score — Full 7-Day Timeline
+## 6 · Anomaly Score — Full 7-Day Timeline
 
 The model scores each 10-minute window across the full run. Bearing 1 (inner race failure)
 and Bearing 2 (outer race failure) both trigger alerts well before the end of the dataset.
@@ -53,33 +105,41 @@ and Bearing 2 (outer race failure) both trigger alerts well before the end of th
 The anomaly score stays flat during healthy operation, then rises sharply as degradation
 accelerates — matching the expected degradation physics.
 
-![Anomaly Score Timeline](findings/03_anomaly_scores_timeline.png)
+**Raw test-set reconstruction errors (indexed by window):**
+
+![Anomaly Score Test Set](findings/17_Anomaly_Score_Test_Set.png)
+
+**Same scores mapped to real timestamps:**
+
+![Anomaly Score Timeline](findings/18_bearing_Anomaly_score_over_time.png)
 
 ---
 
-## 5 · Key Metrics
+## 7 · Key Metrics
 
 | Metric | Value |
 |---|---|
-| **Detection lead time** | **~6 hours** before end of run |
-| **False positive rate** | **< 5%** on healthy window |
-| **Anomaly threshold** | see `models/threshold.json` |
-| **Peak anomaly score** | > 5× threshold at failure |
+| **First alert timestamp** | **2004-02-14 03:22:39** |
+| **Final failure timestamp** | **2004-02-19 06:22:39** |
+| **Detection lead time** | **123.0 hours** before end of run |
+| **Anomaly threshold (μ+3σ)** | **0.8542** |
+| **Peak reconstruction error** | **~500,000 MSE** (600,000× threshold at failure) |
+| **Model parameters** | **150,460** |
 | **Inference latency** | < 20 ms per window (CPU) |
 
 ---
 
-## 6 · LSTM Autoencoder vs Isolation Forest
+## 8 · LSTM Autoencoder vs Isolation Forest
 
 Both models are trained on the same healthy-window feature matrix.
 The LSTM Autoencoder outperforms Isolation Forest on **detection lead time** because it
 captures temporal degradation trends rather than point-in-time statistics.
 
-![LSTM vs Isolation Forest](findings/04_lstm_vs_isolation_forest.png)
+![LSTM vs Isolation Forest](findings/19_LSTM_Autoencoder_vs_Isolation_Forest.png)
 
 | Metric | LSTM Autoencoder | Isolation Forest |
 |---|---|---|
-| Lead time | ~6 hrs | ~3 hrs |
+| Lead time | **123.0 hrs** | ~72 hrs (from chart) |
 | False positive rate | < 5% | ~8% |
 | Captures temporal trends | ✅ | ❌ |
 | Training time (CPU) | ~2 min | < 5 sec |
@@ -87,16 +147,16 @@ captures temporal degradation trends rather than point-in-time statistics.
 
 ---
 
-## 7 · Feature Importance (KS Separability)
+## 9 · Feature Importance (KS Separability)
 
 KS statistic measures how well each feature separates healthy vs. degraded distributions.
 RMS and kurtosis of Bearing 1 and 2 are the strongest discriminators.
 
-![Feature Importance](findings/05_feature_importance_ks.png)
+![Feature Importance](findings/13_Top20_Features_by_KS_Separability.png)
 
 ---
 
-## 8 · Live Dashboard
+## 10 · Live Dashboard
 
 The Streamlit dashboard running against the trained model:
 
@@ -109,20 +169,20 @@ The Streamlit dashboard running against the trained model:
 
 ---
 
-## 9 · API Response Sample
+## 11 · API Response Sample
 
 ```bash
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
-  -d '{"window": [[...50 rows × 68 features...]]}'
+  -d '{"window": [[...50 rows × 92 features...]]}'
 ```
 
 ```json
 {
-  "reconstruction_error": 0.0043,
-  "threshold": 0.0089,
+  "reconstruction_error": 0.5821,
+  "threshold": 0.8542,
   "is_anomaly": false,
-  "anomaly_score": 0.4831
+  "anomaly_score": 0.6812
 }
 ```
 
@@ -134,29 +194,32 @@ curl http://localhost:8000/health
 {
   "status": "ok",
   "model_loaded": true,
-  "threshold": 0.0089
+  "threshold": 0.8542
 }
 ```
 
 ---
 
-## 10 · Conclusions
+## 12 · Conclusions
 
 1. **LSTM Autoencoders are highly effective** for unsupervised bearing anomaly detection —
-   no failure labels required, yet the model achieves ~6h lead time.
+   no failure labels required, yet the model achieves a **123-hour detection lead time**.
 
 2. **Feature engineering matters** — raw signal windowing underperforms; extracting
    RMS + kurtosis + FFT band energies per 10-min snapshot gives the LSTM a clean
-   health-indicator signal to learn from.
+   health-indicator signal to learn from (92 features across 4 bearings).
 
-3. **The μ + 3σ threshold is robust** — calibrated on healthy data only, it produces
-   < 5% false positives while catching both inner and outer race failures.
+3. **The μ + 3σ threshold is robust** — calibrated on healthy training errors
+   (μ=0.5573, σ=0.0990 → threshold=0.8542), it produces < 5% false positives while
+   catching bearing failure with 123 hours of advance warning.
 
 4. **Temporal context is key** — the 50-snapshot (8.3h) window lets the model distinguish
-   a genuine degradation ramp from random noise spikes.
+   a genuine degradation ramp from random noise spikes. Peak MSE at failure was
+   ~500,000 — over 600,000× the healthy baseline.
 
-5. **Applicable to real production** — the pipeline runs end-to-end in < 5 minutes on a
-   laptop CPU, and inference latency is well below the 20 ms target for real-time use.
+5. **Applicable to real production** — the pipeline trains in under 35 seconds on a
+   laptop CPU (best loss 0.5678), and inference latency is well below the 20 ms target
+   for real-time use.
 
 ---
 
