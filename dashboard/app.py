@@ -513,7 +513,7 @@ def build_chart(df: pd.DataFrame, threshold: float) -> go.Figure:
     )
 
     fig.update_layout(
-        paper_bgcolor="transparent",
+        paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="#161b22",
         margin=dict(l=48, r=12, t=12, b=32),
         height=280,
@@ -532,7 +532,7 @@ def build_chart(df: pd.DataFrame, threshold: float) -> go.Figure:
             gridwidth=1,
             tickfont=dict(family="JetBrains Mono", size=10, color="#8b949e"),
             zeroline=False,
-            linecolor="transparent",
+            linecolor="rgba(0,0,0,0)",
         ),
         hoverlabel=dict(
             bgcolor="#1c2128",
