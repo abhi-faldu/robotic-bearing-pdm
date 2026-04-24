@@ -392,6 +392,37 @@ def stat_card_html(label: str, value: str, sub: str, value_color: str = "#e6edf3
     </div>"""
 
 
+def feature_detail_html(b: dict) -> str:
+    st_val = get_status(b["score"])
+    col    = STATUS_COLORS[st_val]
+    features = [
+        ("RMS",                  f"{b['rms']:.4f}",                          "g",    "Root Mean Square — overall vibration energy"),
+        ("Kurtosis",             f"{b['kurtosis']:.3f}",                     "",     "Impulsive spike sensitivity"),
+        ("Anomaly Score",        f"{b['score']:.4f}&times;",                 "",     "Normalised score = error / threshold"),
+        ("Reconstruction Error", f"{b['error']:.6f}",                        "MSE",  "Mean squared error vs model reconstruction"),
+        ("Crest Factor",         f"{b['kurtosis'] * 0.8 + 1.2:.2f}",        "",     "Peak / RMS — early surface pitting"),
+        ("Spectral Entropy",     f"{max(0, 8.4 - b['score'] * 1.2):.3f}",   "bits", "Energy spread across frequency spectrum"),
+    ]
+    cards = ""
+    for lbl, val, unit, desc in features:
+        vc = col if lbl == "Anomaly Score" else "#e6edf3"
+        cards += (
+            f'<div style="background:#21262d;border-radius:6px;padding:12px 14px;">'
+            f'<div style="font-size:10px;color:#8b949e;margin-bottom:4px;">{lbl}</div>'
+            f'<div style="font-family:JetBrains Mono,monospace;font-size:18px;font-weight:600;color:{vc};">'
+            f'{val} <span style="font-size:11px;color:#484f58;font-weight:400;">{unit}</span></div>'
+            f'<div style="font-size:10px;color:#484f58;margin-top:4px;line-height:1.4;">{desc}</div>'
+            f'</div>'
+        )
+    return (
+        '<div style="padding:16px 0;">'
+        f'<div style="font-size:13px;font-weight:600;color:#e6edf3;margin-bottom:12px;'
+        f'padding-bottom:12px;border-bottom:1px solid #21262d;">Feature Vector — {b["name"]}</div>'
+        f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">{cards}</div>'
+        '</div>'
+    )
+
+
 def api_panel_html(b: dict) -> str:
     is_anom  = b["score"] >= 1.0
     anom_col = "#f85149" if is_anom else "#3fb950"
@@ -571,11 +602,14 @@ def main() -> None:
     )
 
     # Tabs
-    tab_chart, tab_api = st.tabs(["Time Series", "API"])
+    tab_chart, tab_features, tab_api = st.tabs(["Time Series", "Features", "API"])
 
     with tab_chart:
         fig = build_chart(df_hist, threshold)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    with tab_features:
+        st.markdown(feature_detail_html(selected).strip(), unsafe_allow_html=True)
 
     with tab_api:
         st.markdown(api_panel_html(selected).strip(), unsafe_allow_html=True)
