@@ -196,23 +196,25 @@ def get_live_bearings() -> list[dict]:
 def get_history(bearing_id: str) -> pd.DataFrame:
     """Return 144-point history for the selected bearing."""
     if bearing_id not in st.session_state.history:
-        # Generate synthetic degradation curve
         pts = []
         now = datetime.utcnow()
-        is_b3 = bearing_id == "b3x"
-        is_b2 = bearing_id == "b2y"
         for i in range(HISTORY_LEN):
-            ts = now - timedelta(minutes=(HISTORY_LEN - i) * 10)
-            base = (0.003 + (i / HISTORY_LEN) * 0.015 if is_b3
-                    else 0.002 + (i / HISTORY_LEN) * 0.005 if is_b2
-                    else 0.002)
-            noise = rng.uniform(-0.0005, 0.0005)
-            spike = (i - 130) * 0.001 if i > 130 and is_b3 else 0
-            error = max(0.0001, base + noise + spike)
+            ts  = now - timedelta(minutes=(HISTORY_LEN - i) * 10)
+            t   = i / HISTORY_LEN          # 0 → 1 over 24 h
+            noise = rng.uniform(-0.03, 0.03)
+            if bearing_id == "b3x":        # critical — ramps past threshold
+                score = 0.30 + t * 0.80 + max(0, (t - 0.82) * 3.5) + noise
+            elif bearing_id == "b2y":      # warning — climbs toward threshold
+                score = 0.38 + t * 0.42 + noise * 0.5
+            elif bearing_id == "b1x":      # healthy — flat low
+                score = 0.28 + t * 0.06 + noise * 0.3
+            else:                          # b4y healthy
+                score = 0.33 + t * 0.08 + noise * 0.3
+            score = max(0.05, score)
             pts.append({
                 "time":  ts.strftime("%H:%M"),
-                "error": error,
-                "score": error / THRESHOLD,
+                "score": round(score, 4),
+                "error": round(score * THRESHOLD, 6),
             })
         st.session_state.history[bearing_id] = pd.DataFrame(pts)
     return st.session_state.history[bearing_id]
