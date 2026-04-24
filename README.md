@@ -108,7 +108,7 @@ python scripts/generate_synthetic_data.py
 ## 🧠 Model Architecture
 
 ```
-Input  [batch, seq_len=50, n_features=44]
+Input  [batch, seq_len=50, n_features=92]
           │
     ┌─────▼──────┐
     │  Encoder   │  2-layer LSTM  →  Linear  →  latent dim=32
@@ -118,7 +118,7 @@ Input  [batch, seq_len=50, n_features=44]
     │  Decoder   │  Linear  →  repeat(seq_len)  →  2-layer LSTM  →  Linear
     └─────┬──────┘
           │
-Output [batch, seq_len=50, n_features=44]
+Output [batch, seq_len=50, n_features=92]
 
 Anomaly Score  =  MSE(input, reconstruction)
 Alert          =  score  >  μ_train + 3σ_train
@@ -171,24 +171,24 @@ import requests
 
 response = requests.post(
     "http://localhost:8000/predict",
-    json={"window": [[...50 rows × 44 features, z-score normalised...]]}
+    json={"window": [[...50 rows × 92 features, z-score normalised...]]}
 )
 print(response.json())
 ```
 
 ```json
 {
-  "reconstruction_error": 0.0043,
-  "threshold": 0.0089,
+  "reconstruction_error": 0.5821,
+  "threshold": 0.8542,
   "is_anomaly": false,
-  "anomaly_score": 0.4831
+  "anomaly_score": 0.6812
 }
 ```
 
 ```bash
 # Health check
 curl http://localhost:8000/health
-# {"status":"ok","model_loaded":true,"threshold":0.0089}
+# {"status":"ok","model_loaded":true,"threshold":0.8542}
 ```
 
 ---
@@ -197,13 +197,29 @@ curl http://localhost:8000/health
 
 | Metric | Value |
 |---|---|
-| Detection lead time | **~6 hours** before bearing failure |
+| Detection lead time | **123 hours** before bearing failure |
 | False positive rate | **< 5%** on healthy run data |
-| Model parameters | **~180K** |
+| Anomaly threshold (μ+3σ) | **0.8542** |
+| Model parameters | **150,460** |
+| Best training loss | **0.5678 MSE** (50 epochs) |
 | Inference latency | **< 20 ms** per window |
-| Training data | First 20% of run (healthy only) |
+| Training data | First 20% of run (healthy only — 147 windows) |
 
 See [`FINDINGS.md`](FINDINGS.md) for full training run outputs, plots, and comparison vs Isolation Forest baseline.
+
+### Visual Evidence
+
+**Bearing degradation signal (RMS + Kurtosis over 7 days):**
+
+![RMS and Kurtosis over Time](findings/07_RMS_and_Kurtosis_over_Time.png)
+
+**LSTM Autoencoder anomaly score — reconstruction error spikes 600,000× at failure:**
+
+![Anomaly Score Over Time](findings/18_bearing_Anomaly_score_over_time.png)
+
+**LSTM Autoencoder vs Isolation Forest — 123h vs ~72h detection lead time:**
+
+![LSTM vs Isolation Forest](findings/19_LSTM_Autoencoder_vs_Isolation_Forest.png)
 
 ---
 
