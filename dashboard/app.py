@@ -35,6 +35,8 @@ import streamlit as st
 API_URL       = os.getenv("API_URL", "http://localhost:8000")
 REFRESH_SECS  = 10          # auto-refresh interval
 THRESHOLD     = 0.8542      # fallback if API unavailable (μ+3σ from training)
+N_FEATURES    = int(os.getenv("N_FEATURES", "92"))  # must match deployed model
+SEQ_LEN       = int(os.getenv("SEQ_LEN",    "50"))  # must match deployed model
 HISTORY_LEN   = 144         # 24 h × 6 per hour (10-min snapshots)
 
 # ── Page config (must be first Streamlit call) ────────────────────────────────
@@ -173,23 +175,49 @@ BEARINGS_META = [
 
 rng = np.random.default_rng(int(time.time()) // REFRESH_SECS)
 
+# Amplitude scale per bearing — drives reconstruction error in synthetic windows.
+# Low amplitude → near-healthy reconstruction; high amplitude → anomalous error.
+_BEARING_AMPLITUDE = {"b1x": 0.15, "b2y": 0.55, "b3x": 2.20, "b4y": 0.20}
+
+
 def get_live_bearings() -> list[dict]:
-    """Return current bearing states — real API or simulated."""
-    health = fetch_health()
-    threshold = health["threshold"] if health else THRESHOLD
+    """Return current bearing states — real API inference or simulated fallback."""
+    health   = fetch_health()
+    api_ok   = health is not None
+    sys_thr  = health["threshold"] if health else THRESHOLD
     bearings = []
+
     for meta in BEARINGS_META:
+        if api_ok:
+            amplitude = _BEARING_AMPLITUDE[meta["id"]]
+            window    = (rng.standard_normal((SEQ_LEN, N_FEATURES)) * amplitude).tolist()
+            result    = fetch_score(window)
+            if result:
+                score = result["anomaly_score"]
+                bearings.append({
+                    **meta,
+                    "score":     round(score, 4),
+                    "rms":       round(max(0.01, meta["base_rms"] * (1 + max(0, score - 0.5) * 0.5)), 4),
+                    "kurtosis":  round(max(0.5, meta["base_kurtosis"] + (score - 1.0) * 1.5), 3),
+                    "error":     round(result["reconstruction_error"], 6),
+                    "threshold": result["threshold"],
+                    "simulated": False,
+                })
+                continue
+
+        # Simulated fallback (API offline or predict call failed)
         noise = rng.uniform(-0.03, 0.03)
         score = max(0.05, meta["base_score"] + noise * (1.5 if meta["id"] == "b3x" else 0.5))
-        error = score * threshold
         bearings.append({
             **meta,
             "score":     round(score, 4),
             "rms":       round(max(0.01, meta["base_rms"] + noise * 0.1), 4),
             "kurtosis":  round(max(0.5, meta["base_kurtosis"] + noise * 0.5), 3),
-            "error":     round(error, 6),
-            "threshold": threshold,
+            "error":     round(score * sys_thr, 6),
+            "threshold": sys_thr,
+            "simulated": True,
         })
+
     return bearings
 
 
@@ -462,8 +490,11 @@ def api_panel_html(b: dict) -> str:
 
 # ── Plotly anomaly chart ───────────────────────────────────────────────────────
 
-def build_chart(df: pd.DataFrame, threshold: float) -> go.Figure:
-    anomaly_mask = df["score"] > threshold
+def build_chart(df: pd.DataFrame) -> go.Figure:
+    # df["score"] stores normalised anomaly_score (= reconstruction_error / threshold).
+    # The alert cutoff in this normalised space is always 1.0.
+    ALERT_CUTOFF = 1.0
+    anomaly_mask = df["score"] > ALERT_CUTOFF
     fig = go.Figure()
 
     # Anomaly fill zone
@@ -501,9 +532,9 @@ def build_chart(df: pd.DataFrame, threshold: float) -> go.Figure:
 
     # Threshold line
     fig.add_hline(
-        y=threshold,
+        y=ALERT_CUTOFF,
         line=dict(color="#f85149", width=1, dash="dash"),
-        annotation_text="Alert Threshold",
+        annotation_text="Alert Threshold (1.0×)",
         annotation_position="top right",
         annotation_font=dict(color="#f85149", size=10),
     )
@@ -580,6 +611,17 @@ def main() -> None:
     # Top bar
     st.markdown(topbar_html(clock, crit_count, warn_count), unsafe_allow_html=True)
 
+    # Simulation mode banner (shown whenever API is offline)
+    if any(b.get("simulated", True) for b in bearings):
+        st.markdown(
+            '<div style="background:rgba(88,166,255,0.08);border-bottom:1px solid rgba(88,166,255,0.25);'
+            'padding:7px 20px;display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+            '<span style="font-size:11px;font-weight:700;letter-spacing:0.04em;color:#58a6ff;">SIMULATION MODE</span>'
+            '<span style="font-size:11px;color:#8b949e;">— API offline &middot; Displaying synthetic bearing data</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
     # Alert banner
     crit_bearings = [b for b in bearings if get_status(b["score"]) == "critical"]
     if crit_bearings and not st.session_state.alert_dismissed:
@@ -607,7 +649,7 @@ def main() -> None:
     tab_chart, tab_features, tab_api = st.tabs(["Time Series", "Features", "API"])
 
     with tab_chart:
-        fig = build_chart(df_hist, threshold)
+        fig = build_chart(df_hist)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     with tab_features:
@@ -640,5 +682,5 @@ def main() -> None:
         st.rerun()
 
 
-if __name__ == "__main__" or True:
+if __name__ == "__main__":
     main()
