@@ -77,8 +77,8 @@ class TestHealth:
         assert r.status_code == 200
 
     def test_model_loaded(self, client):
-        assert r.json()["model_loaded"] is True \
-            for r in [client.get("/health")]  # noqa: E731
+        r = client.get("/health")
+        assert r.json()["model_loaded"] is True
 
     def test_threshold_present(self, client):
         r = client.get("/health")
