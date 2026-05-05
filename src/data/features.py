@@ -49,8 +49,9 @@ def kurtosis(x: np.ndarray) -> float:
     """
     Statistical kurtosis (Fisher's definition, zero for Gaussian).
     Rises sharply when bearing defects produce isolated impulsive events.
+    Returns 0.0 for constant or near-constant signals.
     """
-    return float(stats.kurtosis(x, fisher=True))
+    return float(np.nan_to_num(stats.kurtosis(x, fisher=True), nan=0.0))
 
 
 def crest_factor(x: np.ndarray) -> float:
@@ -68,8 +69,9 @@ def peak_to_peak(x: np.ndarray) -> float:
 
 
 def skewness(x: np.ndarray) -> float:
-    """Signal asymmetry — changes when bearing geometry is damaged."""
-    return float(stats.skew(x))
+    """Signal asymmetry — changes when bearing geometry is damaged.
+    Returns 0.0 for constant or near-constant signals."""
+    return float(np.nan_to_num(stats.skew(x), nan=0.0))
 
 
 def shape_factor(x: np.ndarray) -> float:
