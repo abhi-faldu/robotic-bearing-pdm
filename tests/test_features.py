@@ -88,6 +88,9 @@ class TestKurtosis:
         x[100] = 100.0
         assert kurtosis(x) > 100
 
+    def test_constant_signal_is_finite(self):
+        assert np.isfinite(kurtosis(np.ones(N_SAMPLES, dtype=np.float32)))
+
     def test_returns_float(self, gaussian_signal):
         assert isinstance(kurtosis(gaussian_signal), float)
 
@@ -117,6 +120,9 @@ class TestPeakToPeak:
 class TestSkewness:
     def test_symmetric_signal_near_zero(self, sine_signal):
         assert abs(skewness(sine_signal)) < 0.05
+
+    def test_constant_signal_is_finite(self):
+        assert np.isfinite(skewness(np.ones(N_SAMPLES, dtype=np.float32)))
 
     def test_returns_float(self, gaussian_signal):
         assert isinstance(skewness(gaussian_signal), float)
