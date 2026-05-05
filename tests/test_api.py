@@ -169,6 +169,18 @@ class TestPredictValidation:
         assert r.status_code == 422
 
 
+# ── Normalisation contract ────────────────────────────────────────────────────
+
+class TestPredictNormalisation:
+    def test_raw_window_accepted_and_finite(self, client):
+        """API normalises internally — raw (un-scaled) windows must return finite results."""
+        raw_window = (np.ones((SEQ_LEN, N_FEATURES)) * 5.0).tolist()
+        r = client.post("/predict", json={"window": raw_window})
+        assert r.status_code == 200
+        assert np.isfinite(r.json()["reconstruction_error"])
+        assert np.isfinite(r.json()["anomaly_score"])
+
+
 # ── Schema validation ─────────────────────────────────────────────────────────
 
 class TestSchemas:
