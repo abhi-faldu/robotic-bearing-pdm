@@ -221,22 +221,27 @@ def get_live_bearings() -> list[dict]:
     return bearings
 
 
-def get_history(bearing_id: str) -> pd.DataFrame:
-    """Return 144-point history for the selected bearing."""
+def get_history(bearing_id: str, current_score: float | None = None) -> pd.DataFrame:
+    """Return 144-point rolling history for the selected bearing.
+
+    On first call the full 24-hour backfill is generated synthetically.
+    On subsequent calls the latest score is appended and the oldest row dropped,
+    so the timeline advances with each auto-refresh.
+    """
+    now = datetime.utcnow()
     if bearing_id not in st.session_state.history:
         pts = []
-        now = datetime.utcnow()
         for i in range(HISTORY_LEN):
-            ts  = now - timedelta(minutes=(HISTORY_LEN - i) * 10)
-            t   = i / HISTORY_LEN          # 0 → 1 over 24 h
+            ts    = now - timedelta(minutes=(HISTORY_LEN - i) * 10)
+            t     = i / HISTORY_LEN
             noise = rng.uniform(-0.03, 0.03)
-            if bearing_id == "b3x":        # critical — ramps past threshold
+            if bearing_id == "b3x":
                 score = 0.30 + t * 0.80 + max(0, (t - 0.82) * 3.5) + noise
-            elif bearing_id == "b2y":      # warning — climbs toward threshold
+            elif bearing_id == "b2y":
                 score = 0.38 + t * 0.42 + noise * 0.5
-            elif bearing_id == "b1x":      # healthy — flat low
+            elif bearing_id == "b1x":
                 score = 0.28 + t * 0.06 + noise * 0.3
-            else:                          # b4y healthy
+            else:
                 score = 0.33 + t * 0.08 + noise * 0.3
             score = max(0.05, score)
             pts.append({
@@ -245,6 +250,17 @@ def get_history(bearing_id: str) -> pd.DataFrame:
                 "error": round(score * THRESHOLD, 6),
             })
         st.session_state.history[bearing_id] = pd.DataFrame(pts)
+    elif current_score is not None:
+        # Append latest reading and drop oldest to keep rolling window
+        df      = st.session_state.history[bearing_id]
+        new_row = pd.DataFrame([{
+            "time":  now.strftime("%H:%M"),
+            "score": round(current_score, 4),
+            "error": round(current_score * THRESHOLD, 6),
+        }])
+        st.session_state.history[bearing_id] = pd.concat(
+            [df.iloc[1:], new_row], ignore_index=True
+        )
     return st.session_state.history[bearing_id]
 
 
@@ -611,13 +627,22 @@ def main() -> None:
     # Top bar
     st.markdown(topbar_html(clock, crit_count, warn_count), unsafe_allow_html=True)
 
-    # Simulation mode banner (shown whenever API is offline)
+    # Mode banner
     if any(b.get("simulated", True) for b in bearings):
         st.markdown(
             '<div style="background:rgba(88,166,255,0.08);border-bottom:1px solid rgba(88,166,255,0.25);'
             'padding:7px 20px;display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
             '<span style="font-size:11px;font-weight:700;letter-spacing:0.04em;color:#58a6ff;">SIMULATION MODE</span>'
             '<span style="font-size:11px;color:#8b949e;">— API offline &middot; Displaying synthetic bearing data</span>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="background:rgba(63,185,80,0.07);border-bottom:1px solid rgba(63,185,80,0.2);'
+            'padding:7px 20px;display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+            '<span style="font-size:11px;font-weight:700;letter-spacing:0.04em;color:#3fb950;">LIVE MODE</span>'
+            '<span style="font-size:11px;color:#8b949e;">— Real model inference via API</span>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -632,7 +657,7 @@ def main() -> None:
 
     # Selected bearing
     selected = next((b for b in bearings if b["id"] == st.session_state.selected_id), bearings[0])
-    df_hist  = get_history(selected["id"])
+    df_hist  = get_history(selected["id"], current_score=selected["score"])
 
     # Chart header
     st.markdown(
