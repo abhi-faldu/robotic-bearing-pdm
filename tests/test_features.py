@@ -34,8 +34,8 @@ N_BEARINGS = 4
 
 @pytest.fixture
 def sine_signal():
-    """Pure 500 Hz sine — known analytical properties."""
-    t = np.linspace(0, 1, N_SAMPLES, endpoint=False)
+    """Pure 500 Hz sine at 20 kHz — known analytical properties."""
+    t = np.linspace(0, N_SAMPLES / 20_000, N_SAMPLES, endpoint=False)
     return np.sin(2 * np.pi * 500 * t).astype(np.float32)
 
 @pytest.fixture
