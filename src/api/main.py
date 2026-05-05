@@ -17,6 +17,7 @@ Environment variables (set in .env or docker-compose.yml):
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -37,6 +38,7 @@ logger = logging.getLogger("uvicorn.error")
 MODEL_PATH     = Path(os.getenv("MODEL_PATH",     "models/lstm_autoencoder.pt"))
 THRESHOLD_PATH = Path(os.getenv("THRESHOLD_PATH", "models/threshold.json"))
 SCALER_PATH    = Path(os.getenv("SCALER_PATH",    "models/scaler.npz"))
+CONFIG_PATH    = Path(os.getenv("CONFIG_PATH",    "models/model_config.json"))
 DEVICE         = os.getenv("DEVICE", "cpu")
 
 
@@ -77,15 +79,20 @@ async def lifespan(app: FastAPI):
     # Infer seq_len from the saved state dict (first LSTM weight shape)
     checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
 
-    # Build model — we derive dimensions from the checkpoint
-    # encoder.lstm.weight_ih_l0 shape: (4*hidden, n_features)
-    hidden_dim = checkpoint["encoder.lstm.weight_hh_l0"].shape[1]
-    latent_dim = checkpoint["encoder.fc.weight"].shape[0]
-    n_layers   = sum(1 for k in checkpoint if k.startswith("encoder.lstm.weight_hh"))
-
-    # seq_len is stored in decoder.seq_len (not a weight, so read from architecture)
-    # We default to 50 — can be overridden via env if needed
-    state.seq_len = int(os.getenv("SEQ_LEN", "50"))
+    # Load model architecture from saved config; fall back to tensor-shape inference
+    if CONFIG_PATH.exists():
+        cfg = json.loads(CONFIG_PATH.read_text())
+        hidden_dim    = cfg["hidden_dim"]
+        latent_dim    = cfg["latent_dim"]
+        n_layers      = cfg["n_layers"]
+        state.seq_len = cfg["seq_len"]
+        logger.info("Model config loaded from %s", CONFIG_PATH)
+    else:
+        hidden_dim    = checkpoint["encoder.lstm.weight_hh_l0"].shape[1]
+        latent_dim    = checkpoint["encoder.fc.weight"].shape[0]
+        n_layers      = sum(1 for k in checkpoint if k.startswith("encoder.lstm.weight_hh"))
+        state.seq_len = int(os.getenv("SEQ_LEN", "50"))
+        logger.warning("model_config.json not found — inferring architecture from checkpoint tensors")
 
     state.model = LSTMAutoencoder(
         n_features = state.n_features,
@@ -137,8 +144,9 @@ async def predict(request: PredictRequest) -> PredictResponse:
     """
     Score a single feature window.
 
-    The client sends a pre-normalised window of shape [seq_len, n_features].
-    The API returns the reconstruction error, threshold, and anomaly flag.
+    The client sends a raw (un-normalised) window of shape [seq_len, n_features].
+    The API applies z-score normalisation internally using the training scaler
+    before running inference.
 
     Raises:
         422  — if the window shape does not match the model's expected input.
@@ -163,6 +171,9 @@ async def predict(request: PredictRequest) -> PredictResponse:
                 f"got {window.shape[1]}."
             ),
         )
+
+    # Normalise using training scaler
+    window = (window - state.mu_s) / state.sigma_s
 
     # Inference
     tensor = torch.from_numpy(window).unsqueeze(0).to(DEVICE)  # (1, seq_len, n_features)
