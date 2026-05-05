@@ -13,6 +13,7 @@ Outputs (written to models/):
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -73,6 +74,9 @@ def build_feature_matrix(args: argparse.Namespace):
 
 
 def train(args: argparse.Namespace) -> None:
+    if not (0 < args.train_frac < 1):
+        raise SystemExit(f"--train-frac must be in (0, 1), got {args.train_frac}")
+
     device = args.device if torch.cuda.is_available() or args.device == "cpu" else "cpu"
     logger.info("Device: %s", device)
 
@@ -84,11 +88,22 @@ def train(args: argparse.Namespace) -> None:
         X, timestamps, train_frac=args.train_frac
     )
 
+    if len(X_train) < SEQ_LEN:
+        raise SystemExit(
+            f"Train split has only {len(X_train)} rows but SEQ_LEN={SEQ_LEN}. "
+            "Increase --train-frac or use more data."
+        )
+
     mu, sigma = fit_scaler(X_train)
     X_train_scaled = apply_scaler(X_train, mu, sigma)
     X_test_scaled  = apply_scaler(X_test,  mu, sigma)
 
     train_windows = create_windows(X_train_scaled, seq_len=SEQ_LEN, step=STEP)
+    if len(train_windows) == 0:
+        raise SystemExit(
+            f"No training windows formed from {len(X_train_scaled)} rows "
+            f"with SEQ_LEN={SEQ_LEN}, STEP={STEP}."
+        )
     logger.info("Training windows: %s", train_windows.shape)
 
     train_tensor  = torch.from_numpy(train_windows)
@@ -149,6 +164,18 @@ def train(args: argparse.Namespace) -> None:
     # ── Scaler persistence ────────────────────────────────────────────────────
     np.savez(MODEL_DIR / "scaler.npz", mu=mu, sigma=sigma)
     logger.info("Scaler saved to %s", MODEL_DIR / "scaler.npz")
+
+    # ── Model config persistence ──────────────────────────────────────────────
+    model_config = {
+        "n_features": n_features,
+        "seq_len":    SEQ_LEN,
+        "hidden_dim": args.hidden_dim,
+        "latent_dim": args.latent_dim,
+        "n_layers":   args.n_layers,
+    }
+    config_path = MODEL_DIR / "model_config.json"
+    config_path.write_text(json.dumps(model_config, indent=2))
+    logger.info("Model config saved to %s", config_path)
 
     # ── Quick eval on test set ────────────────────────────────────────────────
     if len(X_test_scaled) >= SEQ_LEN:
