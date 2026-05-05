@@ -10,29 +10,31 @@ from __future__ import annotations
 
 from typing import List
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PredictRequest(BaseModel):
     """
-    A sliding window of feature vectors to score.
+    A sliding window of raw feature vectors to score.
 
     The client sends a 2-D list of shape (seq_len, n_features) — one row per
-    10-minute snapshot, already z-score normalised using the training scaler.
+    10-minute snapshot. The API applies z-score normalisation internally using
+    the training scaler before running inference; callers do not need to
+    normalise the data themselves.
 
     Example (seq_len=3, n_features=2 for brevity):
         {
             "window": [
-                [0.12, -0.34],
-                [0.15, -0.31],
-                [0.18, -0.28]
+                [0.023, 3.14],
+                [0.025, 3.18],
+                [0.024, 3.11]
             ]
         }
     """
 
     window: List[List[float]] = Field(
         ...,
-        description="2-D feature window of shape [seq_len, n_features], z-score normalised.",
+        description="2-D feature window of shape [seq_len, n_features], raw (un-normalised).",
         min_length=1,
     )
 
@@ -75,6 +77,8 @@ class PredictResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Response for the GET /health liveness check."""
+
+    model_config = ConfigDict(protected_namespaces=())
 
     status: str = Field(default="ok")
     model_loaded: bool
