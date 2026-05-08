@@ -19,6 +19,14 @@
 
 ---
 
+## ▶ Project Explainer
+
+[<img src="findings/D04_Bearing3-x_01+.png" alt="Watch the 90-second project explainer" width="800"/>](portfolio_video_github.mp4)
+
+*Click the image to watch the 90-second animated explainer — LSTM-AE architecture, anomaly detection timeline, and live SCADA dashboard.*
+
+---
+
 ## 🏭 Problem
 
 German automotive manufacturers like **BMW**, **Audi**, and **Mercedes-Benz** rely on thousands of industrial robotic arms. A single unexpected bearing failure halts an entire assembly line — costing up to **€500,000 per hour** in downtime.
