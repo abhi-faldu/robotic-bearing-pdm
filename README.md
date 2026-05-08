@@ -21,7 +21,7 @@
 
 ## ▶ Project Explainer
 
-[<img src="findings/D04_Bearing3-x_01+.png" alt="Watch the 90-second project explainer" width="800"/>](portfolio_video_github.mp4)
+[<img src="findings/D04_Bearing3-x_01+.png" alt="Watch the 90-second project explainer" width="800"/>](https://github.com/abhi-faldu/robotic-bearing-pdm/releases/download/v1.0/portfolio_video_github.mp4)
 
 *Click the image to watch the 90-second animated explainer — LSTM-AE architecture, anomaly detection timeline, and live SCADA dashboard.*
 
